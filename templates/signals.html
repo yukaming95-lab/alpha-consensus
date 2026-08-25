@@ -33,7 +33,7 @@
     <div class="sig-title-group">
       <a href="/stock/{{ sig.ticker }}" class="sig-ticker">${{ sig.ticker }}</a>
       <span class="sig-price">${{ "%.2f"|format(sig.price) }}</span>
-      <span class="sig-badge {{ conf_class }}">{{ sig.confidence | upper }} confidence</span>
+      <span class="sig-badge {{ conf_class }}">{{ (sig.confidence or '') | upper }} confidence</span>
     </div>
     <span class="sig-updated">Updated {{ sig.fetched_at[:16] if sig.fetched_at else "—" }}</span>
   </div>
@@ -99,7 +99,7 @@
           <span class="pl-icon">🟢</span>
           <span class="pl-label">Buy Zone</span>
           <span class="pl-price">
-            ${{ "%.2f"|format(tf.buy_zone_low) }} – ${{ "%.2f"|format(tf.buy_zone_high) }}
+            {% if tf.buy_zone_low and tf.buy_zone_high %}${{ "%.2f"|format(tf.buy_zone_low) }} – ${{ "%.2f"|format(tf.buy_zone_high) }}{% else %}—{% endif %}
           </span>
         </div>
 
@@ -175,7 +175,7 @@
             <div class="rsi-30"></div>
             <div class="rsi-70"></div>
           </div>
-          <span class="rsi-val {% if sig.rsi < 35 %}rsi-oversold{% elif sig.rsi > 65 %}rsi-overbought{% endif %}">
+          <span class="rsi-val {% if sig.rsi and sig.rsi < 35 %}rsi-oversold{% elif sig.rsi and sig.rsi > 65 %}rsi-overbought{% endif %}">
             {{ sig.rsi }}
           </span>
         </div>
@@ -183,7 +183,7 @@
 
       <div class="ta-item">
         <span class="ta-lbl">MACD</span>
-        <span class="ta-val {% if sig.macd_hist > 0 %}score-pos-text{% elif sig.macd_hist < 0 %}score-neg-text{% endif %}">
+        <span class="ta-val {% if sig.macd_hist and sig.macd_hist > 0 %}score-pos-text{% elif sig.macd_hist and sig.macd_hist < 0 %}score-neg-text{% endif %}">
           {{ sig.macd }} / Sig: {{ sig.macd_signal }}
           (hist {{ "%+.3f"|format(sig.macd_hist) }})
         </span>
@@ -201,9 +201,9 @@
       <div class="ta-item">
         <span class="ta-lbl">Bollinger</span>
         <span class="ta-val">
-          Upper ${{ "%.2f"|format(sig.bb_upper) }} ·
-          Mid ${{ "%.2f"|format(sig.bb_mid) }} ·
-          Lower ${{ "%.2f"|format(sig.bb_lower) }}
+          {% if sig.bb_upper %}Upper ${{ "%.2f"|format(sig.bb_upper) }} ·{% endif %}
+          {% if sig.bb_mid %}Mid ${{ "%.2f"|format(sig.bb_mid) }} ·{% endif %}
+          {% if sig.bb_lower %}Lower ${{ "%.2f"|format(sig.bb_lower) }}{% endif %}
         </span>
       </div>
 
