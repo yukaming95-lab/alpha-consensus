@@ -1,0 +1,9 @@
+.env
+*.db
+*.db-shm
+*.db-wal
+__pycache__/
+*.pyc
+cloudflared.exe
+AlphaConsensus_URL.txt
+start_alpha.ps1

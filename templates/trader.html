@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}@{{ detail.trader.x_handle }} — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="back-link"><a href="/">&larr; Back to Dashboard</a></div>
+
+<div class="page-header">
+  <h1>@{{ detail.trader.x_handle }}</h1>
+  <p class="subtitle">{{ detail.trader.name }} · {{ detail.trader.description }}</p>
+</div>
+
+<!-- Real 13F portfolio holdings -->
+{% if portfolio %}
+<div class="portfolio-section">
+  <div class="portfolio-header">
+    <div>
+      <h2 class="section-title" style="margin:0">Real Portfolio Holdings <span class="badge badge-bullish">13F SEC Filing</span></h2>
+      <p class="hint">Filed: {{ portfolio.filing_date }} &nbsp;·&nbsp; Total AUM: ${{ portfolio.total_value }}M &nbsp;·&nbsp; {{ portfolio.positions }} positions</p>
+    </div>
+  </div>
+  <div class="alloc-list">
+    {% for h in portfolio.holdings %}
+    <div class="alloc-row">
+      <span class="alloc-ticker" style="min-width:220px;font-size:12px">{{ h.name[:28] }}</span>
+      <div class="alloc-bar-wrap">
+        <div class="alloc-bar-fill" style="width:{{ [h.pct, 100]|min }}%"></div>
+      </div>
+      <span class="alloc-pct">{{ h.pct }}%</span>
+      <span class="alloc-value">${{ h.value_m }}M</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Tweet-based attention allocation -->
+{% if detail.allocation %}
+<h2 class="section-title">Tweet Attention Allocation</h2>
+<p class="hint">How this trader distributes their mentions across stocks</p>
+<div class="alloc-list">
+  {% for a in detail.allocation %}
+  <div class="alloc-row" onclick="location.href='/stock/{{ a.ticker }}'" style="cursor:pointer">
+    <span class="alloc-ticker">${{ a.ticker }}</span>
+    <div class="alloc-bar-wrap">
+      <div class="alloc-bar-fill" style="width:{{ a.pct }}%"></div>
+    </div>
+    <span class="alloc-pct">{{ a.pct }}%</span>
+    <span class="alloc-score {% if a.avg_score > 0 %}score-pos-text{% elif a.avg_score < 0 %}score-neg-text{% endif %}">
+      {{ '%+d' % a.avg_score }}
+    </span>
+    <span class="alloc-counts">
+      <span class="badge badge-bullish">{{ a.bullish }}B</span>
+      <span class="badge badge-bearish">{{ a.bearish }}Be</span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- All mentions table -->
+<h2 class="section-title">All Mentions</h2>
+{% if detail.mentions %}
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Ticker</th>
+        <th>Stance</th>
+        <th>Score</th>
+        <th>Key Signals</th>
+        <th>Reasoning</th>
+        <th>Date</th>
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in detail.mentions %}
+      {% set sc = m.sentiment_score or 0 %}
+      <tr class="clickable" onclick="location.href='/stock/{{ m.ticker }}'">
+        <td><strong>${{ m.ticker }}</strong></td>
+        <td><span class="badge badge-{{ m.stance }}">{{ m.stance | upper }}</span></td>
+        <td class="score-cell {% if sc > 0 %}score-pos-text{% elif sc < 0 %}score-neg-text{% endif %}">
+          {{ '%+d' % sc }}
+        </td>
+        <td class="phrases-cell">
+          {% if m.key_phrases %}
+            {% for ph in m.key_phrases.split(' | ') %}
+              {% if ph.strip() %}<span class="phrase-tag-sm">"{{ ph.strip() }}"</span>{% endif %}
+            {% endfor %}
+          {% else %}—{% endif %}
+        </td>
+        <td class="reasoning-cell">{{ m.reasoning or '—' }}</td>
+        <td class="date-cell">{{ m.posted_at[:10] if m.posted_at else '—' }}</td>
+        <td>
+          {% if m.post_url %}
+          <a href="{{ m.post_url }}" target="_blank" onclick="event.stopPropagation()" class="src-link">↗</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><p>No mentions recorded for this trader yet.</p></div>
+{% endif %}
+{% endblock %}

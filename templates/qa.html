@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Q&A — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>AI Q&amp;A</h1>
+  <p class="subtitle">Ask anything about trader stances and market consensus</p>
+</div>
+
+<div class="qa-examples">
+  <p>Try asking:</p>
+  <button class="example-btn" onclick="setQ(this)">What do the traders think about $AAPL?</button>
+  <button class="example-btn" onclick="setQ(this)">Where is there consensus on $TSLA?</button>
+  <button class="example-btn" onclick="setQ(this)">What does @unusual_whales think about $NVDA?</button>
+  <button class="example-btn" onclick="setQ(this)">Which stocks have the most disagreement?</button>
+</div>
+
+<div class="qa-panel">
+  <div class="qa-messages" id="qa-messages"></div>
+  <div class="qa-input-row">
+    <input type="text" id="qa-input" class="qa-input" placeholder="Ask about market consensus…" />
+    <button class="qa-send-btn" id="qa-send">Ask</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setQ(btn) {
+  document.getElementById("qa-input").value = btn.textContent;
+  document.getElementById("qa-input").focus();
+}
+
+function appendMessage(role, text, signal) {
+  const el = document.createElement("div");
+  el.className = "qa-msg qa-msg-" + role;
+  let inner = `<span class="qa-role">${role === "user" ? "You" : "Alpha Consensus"}</span><p>${text.replace(/\n/g, "<br>")}</p>`;
+
+  if (signal && role === "assistant") {
+    inner += buildSignalCard(signal);
+  }
+  el.innerHTML = inner;
+  document.getElementById("qa-messages").appendChild(el);
+  el.scrollIntoView({ behavior: "smooth" });
+}
+
+function fmtPrice(v) { return v ? "$" + parseFloat(v).toFixed(2) : "—"; }
+
+function buildTfRow(tf, label, icon) {
+  if (!tf || !tf.buy_zone_low) return "";
+  return `
+    <div class="qa-tf-card">
+      <div class="qa-tf-head">${icon} ${label} &nbsp;<span class="tf-rr">R:R ${tf.risk_reward || "—"}</span></div>
+      <div class="price-levels">
+        <div class="pl-row pl-tp2"><span class="pl-icon">🎯</span><span class="pl-label">Target 2</span><span class="pl-price">${fmtPrice(tf.take_profit_2)}</span></div>
+        <div class="pl-row pl-tp1"><span class="pl-icon">✅</span><span class="pl-label">Target 1</span><span class="pl-price">${fmtPrice(tf.take_profit_1)}</span></div>
+        <div class="pl-row pl-buy"><span class="pl-icon">🟢</span><span class="pl-label">Buy Zone</span><span class="pl-price">${fmtPrice(tf.buy_zone_low)} – ${fmtPrice(tf.buy_zone_high)}</span></div>
+        <div class="pl-row pl-current"><span class="pl-icon">📍</span><span class="pl-label">Now</span><span class="pl-price">—</span></div>
+        <div class="pl-row pl-stop"><span class="pl-icon">🛑</span><span class="pl-label">Stop Loss</span><span class="pl-price">${fmtPrice(tf.stop_loss)}</span></div>
+      </div>
+      ${tf.entry_note ? `<div class="tf-entry-note">💡 ${tf.entry_note}</div>` : ""}
+    </div>`;
+}
+
+function buildSignalCard(sig) {
+  const conf = sig.confidence || "medium";
+  const confClass = conf === "high" ? "conf-high" : conf === "medium" ? "conf-med" : "conf-low";
+  return `
+    <div class="qa-signal-card">
+      <div class="qa-signal-header">
+        <span class="sig-ticker">$${sig.ticker}</span>
+        <span class="sig-price">$${parseFloat(sig.price).toFixed(2)}</span>
+        <span class="sig-badge ${confClass}">${conf.toUpperCase()} confidence</span>
+      </div>
+      <div class="qa-tf-grid">
+        ${buildTfRow(sig.short_term,     "Short-Term (3–10 days)",  "⚡")}
+        ${buildTfRow(sig.swing_trade,    "Swing Trade (1–4 weeks)", "🔄")}
+        ${buildTfRow(sig.position_trade, "Position (1–3 months)",   "🏗️")}
+      </div>
+      ${sig.technical_summary ? `<div class="qa-tech-note">🤖 ${sig.technical_summary}</div>` : ""}
+      <div class="qa-signal-disclaimer">⚠️ Educational only — not financial advice</div>
+    </div>`;
+}
+
+async function sendQuestion() {
+  const input = document.getElementById("qa-input");
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = "";
+  appendMessage("user", q);
+  const sendBtn = document.getElementById("qa-send");
+  sendBtn.disabled = true;
+  sendBtn.textContent = "…";
+
+  try {
+    const res  = await fetch("/api/qa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q }),
+    });
+    const data = await res.json();
+    appendMessage("assistant", data.answer || "No answer.", data.signal);
+  } catch (e) {
+    appendMessage("assistant", "Error: " + e.message);
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Ask";
+  }
+}
+
+document.getElementById("qa-send").addEventListener("click", sendQuestion);
+document.getElementById("qa-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") sendQuestion();
+});
+</script>
+{% endblock %}

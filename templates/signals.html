@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}Trading Signals — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
+  <div>
+    <h1>📈 Trading Signals</h1>
+    <p class="subtitle">Technical analysis for bullish-consensus stocks — buy zones, stop losses &amp; targets for 3 timeframes</p>
+  </div>
+  <button class="btn-refresh" onclick="triggerRefresh()" id="btn-sig-refresh">🔄 Refresh Now</button>
+</div>
+
+<div class="sig-disclaimer">
+  ⚠️ <strong>Educational only — not financial advice.</strong>
+  These signals are AI-generated from technical indicators. Always do your own research and manage your risk.
+</div>
+
+{% if not signals %}
+<div class="empty-state">
+  <p>Signals are computing in the background (first run takes ~2 minutes). Refresh this page in a moment.</p>
+  <p style="margin-top:.5rem;color:var(--muted);font-size:13px;">Only stocks with bullish consensus from the 10 tracked traders will appear here.</p>
+</div>
+
+{% else %}
+{% for sig in signals %}
+{% set conf_class = "conf-high" if sig.confidence == "high" else ("conf-med" if sig.confidence == "medium" else "conf-low") %}
+
+<!-- ══ Stock section ════════════════════════════════════════════════════════ -->
+<div class="sig-section" id="sig-{{ sig.ticker }}">
+
+  <!-- Header -->
+  <div class="sig-header">
+    <div class="sig-title-group">
+      <a href="/stock/{{ sig.ticker }}" class="sig-ticker">${{ sig.ticker }}</a>
+      <span class="sig-price">${{ "%.2f"|format(sig.price) }}</span>
+      <span class="sig-badge {{ conf_class }}">{{ sig.confidence | upper }} confidence</span>
+    </div>
+    <span class="sig-updated">Updated {{ sig.fetched_at[:16] if sig.fetched_at else "—" }}</span>
+  </div>
+
+  <!-- TradingView Chart -->
+  <div class="tv-chart-wrap">
+    <div id="tv_{{ sig.ticker }}" class="tv-chart-container"></div>
+  </div>
+
+  <!-- Key level alert bar -->
+  {% if sig.key_level %}
+  <div class="key-level-bar">
+    <span class="kl-label">⚡ Key Level to Watch:</span>
+    <span class="kl-price">${{ "%.2f"|format(sig.key_level) }}</span>
+    <span class="kl-note">{{ sig.key_level_note }}</span>
+  </div>
+  {% endif %}
+
+  <!-- Three timeframe cards -->
+  <div class="timeframe-grid">
+    {% for tf_key, tf_label, tf_icon in [
+        ("short_term",     "Short-Term (3–10 days)",  "⚡"),
+        ("swing_trade",    "Swing Trade (1–4 weeks)", "🔄"),
+        ("position_trade", "Position (1–3 months)",   "🏗️")
+    ] %}
+    {% set tf = sig[tf_key] %}
+    {% if tf and tf is mapping %}
+    <div class="tf-card">
+      <div class="tf-card-header">
+        <span class="tf-icon">{{ tf_icon }}</span>
+        <span class="tf-label">{{ tf_label }}</span>
+        <span class="tf-rr">R:R {{ tf.risk_reward }}</span>
+      </div>
+
+      <!-- Price levels visual -->
+      <div class="price-levels">
+        <!-- Take profit 2 (top) -->
+        {% if tf.take_profit_2 %}
+        <div class="pl-row pl-tp2">
+          <span class="pl-icon">🎯</span>
+          <span class="pl-label">Target 2</span>
+          <span class="pl-price">${{ "%.2f"|format(tf.take_profit_2) }}</span>
+          {% if sig.price %}
+          <span class="pl-pct tp-pct">+{{ "%.1f"|format((tf.take_profit_2 / sig.price - 1) * 100) }}%</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Take profit 1 -->
+        {% if tf.take_profit_1 %}
+        <div class="pl-row pl-tp1">
+          <span class="pl-icon">✅</span>
+          <span class="pl-label">Target 1</span>
+          <span class="pl-price">${{ "%.2f"|format(tf.take_profit_1) }}</span>
+          {% if sig.price %}
+          <span class="pl-pct tp-pct">+{{ "%.1f"|format((tf.take_profit_1 / sig.price - 1) * 100) }}%</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Buy zone -->
+        <div class="pl-row pl-buy">
+          <span class="pl-icon">🟢</span>
+          <span class="pl-label">Buy Zone</span>
+          <span class="pl-price">
+            ${{ "%.2f"|format(tf.buy_zone_low) }} – ${{ "%.2f"|format(tf.buy_zone_high) }}
+          </span>
+        </div>
+
+        <!-- Current price indicator -->
+        <div class="pl-row pl-current">
+          <span class="pl-icon">📍</span>
+          <span class="pl-label">Now</span>
+          <span class="pl-price">${{ "%.2f"|format(sig.price) }}</span>
+        </div>
+
+        <!-- Stop loss -->
+        {% if tf.stop_loss %}
+        <div class="pl-row pl-stop">
+          <span class="pl-icon">🛑</span>
+          <span class="pl-label">Stop Loss</span>
+          <span class="pl-price">${{ "%.2f"|format(tf.stop_loss) }}</span>
+          {% if sig.price %}
+          <span class="pl-pct sl-pct">{{ "%.1f"|format((tf.stop_loss / sig.price - 1) * 100) }}%</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Entry note -->
+      {% if tf.entry_note %}
+      <div class="tf-entry-note">💡 {{ tf.entry_note }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Technical analysis breakdown -->
+  <div class="ta-grid">
+
+    <!-- Chart & candle patterns -->
+    <div class="ta-box">
+      <div class="ta-box-title">📊 Pattern Analysis</div>
+      {% if sig.chart_pattern %}
+      <div class="ta-item">
+        <span class="ta-lbl">Chart Pattern</span>
+        <span class="ta-val">{{ sig.chart_pattern }}</span>
+      </div>
+      {% endif %}
+      {% if sig.candle_signal %}
+      <div class="ta-item">
+        <span class="ta-lbl">Candle Signal</span>
+        <span class="ta-val">{{ sig.candle_signal }}</span>
+      </div>
+      {% endif %}
+      {% if sig.candle_patterns %}
+      <div class="ta-item">
+        <span class="ta-lbl">Detected Candles</span>
+        <div class="candle-tags">
+          {% for pat in sig.candle_patterns %}
+          <span class="candle-tag">{{ pat }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Indicators -->
+    <div class="ta-box">
+      <div class="ta-box-title">📉 Indicators</div>
+
+      <!-- RSI bar -->
+      <div class="ta-item">
+        <span class="ta-lbl">RSI (14)</span>
+        <div class="rsi-wrap">
+          <div class="rsi-track">
+            <div class="rsi-fill" style="width:{{ sig.rsi or 50 }}%"></div>
+            <div class="rsi-30"></div>
+            <div class="rsi-70"></div>
+          </div>
+          <span class="rsi-val {% if sig.rsi < 35 %}rsi-oversold{% elif sig.rsi > 65 %}rsi-overbought{% endif %}">
+            {{ sig.rsi }}
+          </span>
+        </div>
+      </div>
+
+      <div class="ta-item">
+        <span class="ta-lbl">MACD</span>
+        <span class="ta-val {% if sig.macd_hist > 0 %}score-pos-text{% elif sig.macd_hist < 0 %}score-neg-text{% endif %}">
+          {{ sig.macd }} / Sig: {{ sig.macd_signal }}
+          (hist {{ "%+.3f"|format(sig.macd_hist) }})
+        </span>
+      </div>
+
+      <div class="ta-item">
+        <span class="ta-lbl">Moving Avg</span>
+        <span class="ta-val">
+          {% if sig.sma20  %}SMA20 ${{ "%.2f"|format(sig.sma20) }}{% endif %}
+          {% if sig.sma50  %} · SMA50 ${{ "%.2f"|format(sig.sma50) }}{% endif %}
+          {% if sig.sma200 %} · SMA200 ${{ "%.2f"|format(sig.sma200) }}{% endif %}
+        </span>
+      </div>
+
+      <div class="ta-item">
+        <span class="ta-lbl">Bollinger</span>
+        <span class="ta-val">
+          Upper ${{ "%.2f"|format(sig.bb_upper) }} ·
+          Mid ${{ "%.2f"|format(sig.bb_mid) }} ·
+          Lower ${{ "%.2f"|format(sig.bb_lower) }}
+        </span>
+      </div>
+
+      <div class="ta-item">
+        <span class="ta-lbl">Volume</span>
+        <span class="ta-val">{{ sig.volume_trend }}</span>
+      </div>
+    </div>
+
+    <!-- Support / Resistance -->
+    <div class="ta-box">
+      <div class="ta-box-title">🧱 Support &amp; Resistance</div>
+
+      {% if sig.resistance %}
+      <div class="sr-group">
+        <div class="sr-label resist-label">Resistance</div>
+        {% for r in sig.resistance | sort(reverse=True) %}
+        <div class="sr-row resist-row">
+          <div class="sr-bar-wrap">
+            <div class="sr-bar resist-bar"
+                 style="width:{{ [((r / sig.price) * 60)|round, 95]|min }}%"></div>
+          </div>
+          <span class="sr-price">${{ "%.2f"|format(r) }}</span>
+          <span class="sr-dist {% if r > sig.price %}tp-pct{% else %}sl-pct{% endif %}">
+            {{ "%+.1f"|format((r / sig.price - 1) * 100) }}%
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="sr-current-line">── current ${{ "%.2f"|format(sig.price) }} ──</div>
+
+      {% if sig.support %}
+      <div class="sr-group">
+        <div class="sr-label support-label">Support</div>
+        {% for s in sig.support | sort(reverse=True) %}
+        <div class="sr-row support-row">
+          <div class="sr-bar-wrap">
+            <div class="sr-bar support-bar"
+                 style="width:{{ [((sig.price / s) * 55)|round, 95]|min }}%"></div>
+          </div>
+          <span class="sr-price">${{ "%.2f"|format(s) }}</span>
+          <span class="sr-dist sl-pct">{{ "%+.1f"|format((s / sig.price - 1) * 100) }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- /ta-grid -->
+
+  <!-- AI technical summary -->
+  {% if sig.technical_summary %}
+  <div class="sig-summary-box">
+    <span class="sig-summary-label">🤖 AI Technical View</span>
+    <p>{{ sig.technical_summary }}</p>
+  </div>
+  {% endif %}
+
+</div><!-- /sig-section -->
+{% endfor %}
+{% endif %}
+
+<div id="sig-refresh-msg" style="display:none;margin-top:1rem;color:var(--muted);font-size:.9rem;">
+  Signals are computing (takes ~2 min for all stocks). Reload the page when ready.
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- TradingView Lightweight Charts script -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+// Render TradingView widget for each stock
+const tvConfigs = [
+  {% for sig in signals %}
+  { id: "tv_{{ sig.ticker }}", symbol: "{{ sig.tv_symbol or 'NASDAQ:' ~ sig.ticker }}" },
+  {% endfor %}
+];
+
+document.addEventListener("DOMContentLoaded", () => {
+  tvConfigs.forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    if (!el) return;
+    try {
+      new TradingView.widget({
+        container_id: cfg.id,
+        symbol:       cfg.symbol,
+        interval:     "D",
+        timezone:     "America/New_York",
+        theme:        "dark",
+        style:        "1",
+        locale:       "en",
+        toolbar_bg:   "#161a22",
+        width:        "100%",
+        height:       420,
+        enable_publishing: false,
+        hide_top_toolbar:  false,
+        hide_legend:       false,
+        save_image:        false,
+        studies: [
+          "RSI@tv-basicstudies",
+          "MACD@tv-basicstudies",
+          "BB@tv-basicstudies"
+        ],
+        show_popup_button: true,
+      });
+    } catch(e) {
+      el.innerHTML = `<div style="padding:20px;color:#8892a4;font-size:13px;">
+        Chart unavailable — <a href="https://www.tradingview.com/chart/?symbol=${cfg.symbol}"
+        target="_blank" style="color:#3b82f6;">Open on TradingView ↗</a></div>`;
+    }
+  });
+});
+
+function triggerRefresh() {
+  const btn = document.getElementById("btn-sig-refresh");
+  btn.disabled = true;
+  btn.textContent = "⏳ Computing...";
+  fetch("/api/signals/refresh", { method: "POST" })
+    .then(r => r.json())
+    .then(() => {
+      document.getElementById("sig-refresh-msg").style.display = "block";
+      btn.textContent = "✅ Running";
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = "🔄 Refresh Now";
+    });
+}
+</script>
+{% endblock %}

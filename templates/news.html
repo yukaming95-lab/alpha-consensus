@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Market News — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
+  <div>
+    <h1>📰 Daily Market News</h1>
+    <p class="subtitle">AI-summarized surge &amp; drop catalysts for tracked stocks — refreshes every 24 hours</p>
+  </div>
+  <button id="btn-refresh" class="btn-refresh" onclick="triggerRefresh()">🔄 Refresh Now</button>
+</div>
+
+{% if not feed %}
+<div class="empty-state">
+  <p>News is loading in the background. Check back in a minute or click Refresh Now.</p>
+</div>
+{% else %}
+
+<!-- Quick overview strip -->
+<div class="news-overview-strip">
+  {% set bull_count = feed | selectattr('overall_sentiment','equalto','bullish') | list | length %}
+  {% set bear_count = feed | selectattr('overall_sentiment','equalto','bearish') | list | length %}
+  {% set neu_count  = feed | selectattr('overall_sentiment','equalto','neutral')  | list | length %}
+  <span class="news-stat bull">🟢 {{ bull_count }} Bullish</span>
+  <span class="news-stat bear">🔴 {{ bear_count }} Bearish</span>
+  <span class="news-stat neu">⚪ {{ neu_count }} Neutral</span>
+  <span class="news-stat total">{{ feed | length }} stocks tracked</span>
+  {% if feed %}
+  <span class="news-stat date">Updated: {{ feed[0].fetched_at[:16] if feed[0].fetched_at else '—' }}</span>
+  {% endif %}
+</div>
+
+<!-- Cards grid -->
+<div class="news-grid">
+  {% for item in feed %}
+  {% set sent = item.overall_sentiment or 'neutral' %}
+  {% set score = item.sentiment_score or 0 %}
+  <div class="news-card news-{{ sent }}">
+
+    <!-- Card header -->
+    <div class="news-card-header">
+      <a href="/stock/{{ item.ticker }}" class="news-ticker">${{ item.ticker }}</a>
+      <span class="badge badge-{{ sent }}">{{ sent | upper }}</span>
+      <span class="news-score {% if score > 0 %}score-pos-text{% elif score < 0 %}score-neg-text{% endif %}">
+        {{ '%+d' % score }}
+      </span>
+    </div>
+
+    <!-- Score bar -->
+    <div class="score-row">
+      <div class="score-track">
+        <div class="score-fill {% if score > 0 %}score-pos{% elif score < 0 %}score-neg{% else %}score-zero{% endif %}"
+             style="width:{{ [score|abs, 100]|min }}%;
+                    margin-left:{% if score >= 0 %}50%{% else %}{{ 50 - score|abs }}%{% endif %}">
+        </div>
+        <div class="score-midline"></div>
+      </div>
+    </div>
+
+    <!-- AI summary -->
+    {% if item.summary %}
+    <p class="news-summary">{{ item.summary }}</p>
+    {% endif %}
+
+    <!-- Bull / Bear split -->
+    <div class="news-signals">
+      {% if item.bull_points %}
+      <div class="signal-col bull-col">
+        <div class="signal-label">🟢 Bullish signals</div>
+        <ul>
+          {% for pt in item.bull_points %}
+          <li>{{ pt }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if item.bear_points %}
+      <div class="signal-col bear-col">
+        <div class="signal-label">🔴 Risk factors</div>
+        <ul>
+          {% for pt in item.bear_points %}
+          <li>{{ pt }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Sources used by AI -->
+    {% if item.sources_used %}
+    <div class="news-sources-row">
+      <span class="news-sources-label">Sources:</span>
+      {% for src in item.sources_used.split(',') %}
+        {% set s = src.strip() %}
+        {% if s %}<span class="news-source-chip">{{ s }}</span>{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Raw headlines -->
+    {% if item.headlines %}
+    <details class="news-headlines-wrap">
+      <summary>{{ item.headlines | length }} recent headlines</summary>
+      <ul class="news-headline-list">
+        {% for h in item.headlines %}
+        <li>
+          {% if h.url %}
+          <a href="{{ h.url }}" target="_blank" rel="noopener">{{ h.headline }}</a>
+          {% else %}
+          {{ h.headline }}
+          {% endif %}
+          {% if h.source_name %}
+          <span class="hl-source">{{ h.source_name }}</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div id="refresh-msg" style="display:none;margin-top:1rem;color:var(--muted);font-size:.9rem;">
+  Refresh triggered — news will update in ~60 seconds. Reload the page to see results.
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function triggerRefresh() {
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled = true;
+  btn.textContent = '⏳ Refreshing...';
+  fetch('/api/news/refresh', {method:'POST'})
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('refresh-msg').style.display = 'block';
+      btn.textContent = '✅ Triggered';
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = '🔄 Refresh Now';
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}${{ detail.ticker }} — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="back-link"><a href="/">&larr; Back to Dashboard</a></div>
+
+<div class="page-header">
+  <h1>${{ detail.ticker }}</h1>
+  <p class="subtitle">Stance distribution across tracked traders</p>
+</div>
+
+<!-- Stance bar -->
+{% set total = detail.counts.bullish + detail.counts.bearish + detail.counts.neutral %}
+{% if total > 0 %}
+<div class="stance-bar-wrap">
+  <div class="stance-bar">
+    {% if detail.counts.bullish > 0 %}
+    <div class="bar-seg bullish" style="width:{{ (detail.counts.bullish / total * 100)|round }}%">{{ detail.counts.bullish }} Bullish</div>
+    {% endif %}
+    {% if detail.counts.bearish > 0 %}
+    <div class="bar-seg bearish" style="width:{{ (detail.counts.bearish / total * 100)|round }}%">{{ detail.counts.bearish }} Bearish</div>
+    {% endif %}
+    {% if detail.counts.neutral > 0 %}
+    <div class="bar-seg neutral" style="width:{{ (detail.counts.neutral / total * 100)|round }}%">{{ detail.counts.neutral }} Neutral</div>
+    {% endif %}
+  </div>
+  <div class="stance-counts">
+    <span class="badge badge-bullish">🟢 {{ detail.counts.bullish }} Bullish</span>
+    <span class="badge badge-bearish">🔴 {{ detail.counts.bearish }} Bearish</span>
+    <span class="badge badge-neutral">⚪ {{ detail.counts.neutral }} Neutral</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- Trader stance cards -->
+<h2 class="section-title">Trader Stances</h2>
+{% if detail.latest %}
+<div class="cards-grid">
+  {% for r in detail.latest %}
+  {% set score = r.sentiment_score or 0 %}
+  <div class="stance-card stance-{{ r.stance }}">
+
+    <!-- Header row -->
+    <div class="card-header">
+      <a href="/trader/{{ r.x_handle }}" class="trader-link">@{{ r.x_handle }}</a>
+      <span class="card-name">{{ r.name }}</span>
+      <span class="badge badge-{{ r.stance }}">{{ r.stance | upper }}</span>
+    </div>
+
+    <!-- Sentiment score bar -->
+    <div class="score-row">
+      <span class="score-label">Sentiment</span>
+      <div class="score-track">
+        <div class="score-fill {% if score > 0 %}score-pos{% elif score < 0 %}score-neg{% else %}score-zero{% endif %}"
+             style="width:{{ [score|abs, 100]|min }}%;
+                    margin-left:{% if score >= 0 %}50%{% else %}{{ 50 - score|abs }}%{% endif %}">
+        </div>
+        <div class="score-midline"></div>
+      </div>
+      <span class="score-num {% if score > 0 %}score-pos-text{% elif score < 0 %}score-neg-text{% endif %}">
+        {{ '%+d' % score }}
+      </span>
+    </div>
+
+    <!-- Original tweet (shown first — source of truth) -->
+    {% if r.post_text %}
+    <div class="original-post">
+      <div class="original-post-label">
+        📝 Original tweet
+        {% if r.post_url %}
+        <a href="{{ r.post_url }}" target="_blank" class="src-link-inline">View on X ↗</a>
+        {% else %}
+        <span class="no-url-note">(demo data — no live URL)</span>
+        {% endif %}
+      </div>
+      <p class="post-text-main">{{ r.post_text }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Key phrases DeepSeek extracted from the tweet above -->
+    {% if r.key_phrases %}
+    <div class="key-phrases">
+      <span class="phrases-label">AI picked these signals:</span>
+      {% for phrase in r.key_phrases.split(' | ') %}
+        {% if phrase.strip() %}
+        <span class="phrase-tag">"{{ phrase.strip() }}"</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- AI conclusion -->
+    <div class="ai-reasoning">
+      <span class="ai-label">🤖 AI conclusion:</span>
+      <span class="card-reasoning">{{ r.reasoning or '—' }}</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="card-footer">
+      <span class="card-date">{{ r.posted_at[:10] if r.posted_at else '' }}</span>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><p>No stances recorded yet.</p></div>
+{% endif %}
+
+<!-- History -->
+{% if detail.history %}
+<h2 class="section-title">History</h2>
+<div class="history-list">
+  {% for r in detail.history %}
+  <div class="history-row">
+    <span class="history-date">{{ r.posted_at[:10] if r.posted_at else '' }}</span>
+    <span class="history-handle">@{{ r.x_handle }}</span>
+    <span class="badge badge-{{ r.stance }}">{{ r.stance }}</span>
+    {% set sc = r.sentiment_score or 0 %}
+    <span class="score-chip {% if sc > 0 %}score-pos-text{% elif sc < 0 %}score-neg-text{% endif %}">
+      {{ '%+d' % sc }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

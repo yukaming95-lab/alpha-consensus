@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Market Consensus Dashboard</h1>
+  <p class="subtitle">Tracking 10 X opinion leaders · AI-classified stances · Updates every 3 h</p>
+</div>
+
+<!-- Period tabs -->
+<div class="tabs">
+  <a href="/?period=daily"   class="tab {% if period=='daily'   %}active{% endif %}">Daily</a>
+  <a href="/?period=weekly"  class="tab {% if period=='weekly'  %}active{% endif %}">Weekly</a>
+  <a href="/?period=monthly" class="tab {% if period=='monthly' %}active{% endif %}">Monthly</a>
+</div>
+
+<!-- Summary strip -->
+<div class="summary-strip">
+  <div class="stat"><span class="stat-num">{{ totals.stocks }}</span><span class="stat-label">Stocks Tracked</span></div>
+  <div class="stat bullish-stat"><span class="stat-num">{{ totals.bullish }}</span><span class="stat-label">Bullish Consensus</span></div>
+  <div class="stat bearish-stat"><span class="stat-num">{{ totals.bearish }}</span><span class="stat-label">Bearish Consensus</span></div>
+  <div class="stat contested-stat"><span class="stat-num">{{ totals.contested }}</span><span class="stat-label">Contested</span></div>
+</div>
+
+{% if data %}
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Ticker</th>
+        <th>Consensus</th>
+        <th>Score</th>
+        <th>🟢 Bullish</th>
+        <th>🔴 Bearish</th>
+        <th>⚪ Neutral</th>
+        <th>Mentions</th>
+        <th>Traders</th>
+        <th>Last Activity</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in data %}
+      <tr class="clickable" onclick="location.href='/stock/{{ row.ticker }}'">
+        <td class="ticker-cell"><strong>${{ row.ticker }}</strong></td>
+        <td><span class="badge badge-{{ row.consensus }}">{{ row.consensus | upper }}</span></td>
+        <td class="num {% if row.avg_score > 0 %}score-pos-text{% elif row.avg_score < 0 %}score-neg-text{% endif %}">
+          {{ '%+d' % row.avg_score }}
+        </td>
+        <td class="num bullish-num">{{ row.bullish }}</td>
+        <td class="num bearish-num">{{ row.bearish }}</td>
+        <td class="num neutral-num">{{ row.neutral }}</td>
+        <td class="num">{{ row.total }}</td>
+        <td class="handles-cell">
+          {% for h in row.handles[:4] %}
+            <span class="handle-tag">@{{ h }}</span>
+          {% endfor %}
+          {% if row.handles|length > 4 %}
+            <span class="handle-tag more">+{{ row.handles|length - 4 }}</span>
+          {% endif %}
+        </td>
+        <td class="date-cell">{{ row.last_update[:10] if row.last_update else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>📭 No data yet for the <strong>{{ period }}</strong> period.</p>
+  <p>Go to <a href="/admin">Admin</a> to add your first posts, or run <code>python seed_data.py</code> for demo data.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Auto-reload every 3 hours to match the tweet fetch interval
+  setTimeout(() => location.reload(), 3 * 60 * 60 * 1000);
+</script>
+{% endblock %}

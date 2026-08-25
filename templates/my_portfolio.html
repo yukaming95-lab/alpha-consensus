@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}My Portfolio — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
+  <div>
+    <h1>💼 My Portfolio</h1>
+    <p class="subtitle">Live Futu positions with AI signals, consensus &amp; risk alerts</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <a href="?env=REAL"     class="env-btn {% if env=='REAL' %}env-active{% endif %}">Live Account</a>
+    <a href="?env=SIMULATE" class="env-btn {% if env=='SIMULATE' %}env-active{% endif %}">Paper Trading</a>
+    <button class="btn-refresh" onclick="location.reload()">🔄 Refresh</button>
+  </div>
+</div>
+
+<!-- Connection status -->
+{% if not connected %}
+  {% if positions %}
+  <div class="sync-banner">
+    📡 Showing last synced data from your PC
+    {% if synced_at %}<span class="sync-time">— synced {{ synced_at }} UTC</span>{% endif %}
+  </div>
+  {% else %}
+  <div class="futu-setup-box">
+    <div class="setup-title">⚡ Waiting for first sync from your PC</div>
+    <p>Run the sync script on your computer to push Futu positions here:</p>
+    <pre class="setup-code">python sync_portfolio.py</pre>
+    <p class="setup-note">Once running, your portfolio syncs every 10 minutes automatically.</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+{% if connected or positions %}
+{% if not connected %}<div style="height:0"></div>{% endif %}
+
+<!-- Account summary bar -->
+{% if account %}
+<div class="acct-bar">
+  <div class="acct-stat">
+    <div class="acct-label">Total Assets</div>
+    <div class="acct-val">${{ "{:,.2f}".format(account.total_assets) }} {{ account.currency }}</div>
+  </div>
+  <div class="acct-stat">
+    <div class="acct-label">Market Value</div>
+    <div class="acct-val">${{ "{:,.2f}".format(account.market_val) }}</div>
+  </div>
+  <div class="acct-stat">
+    <div class="acct-label">Cash</div>
+    <div class="acct-val">${{ "{:,.2f}".format(account.cash) }}</div>
+  </div>
+  <div class="acct-stat">
+    <div class="acct-label">Buying Power</div>
+    <div class="acct-val">${{ "{:,.2f}".format(account.buying_power) }}</div>
+  </div>
+  <div class="acct-stat">
+    <div class="acct-label">Updated</div>
+    <div class="acct-val acct-time">{{ account.fetched_at[:16] if account.fetched_at else "—" }}</div>
+  </div>
+</div>
+{% endif %}
+
+{% if not positions %}
+<div class="empty-state"><p>No open positions found in your {{ env }} account.</p></div>
+
+{% else %}
+
+<!-- Alert summary -->
+{% set alert_count = positions | selectattr('alerts') | list | length %}
+{% if alert_count > 0 %}
+<div class="alert-summary">
+  ⚠️ <strong>{{ alert_count }} position{{ 's' if alert_count > 1 else '' }}</strong>
+  need{{ '' if alert_count > 1 else 's' }} your attention — see highlighted cards below.
+</div>
+{% endif %}
+
+<!-- Position cards -->
+{% for pos in positions %}
+{% set has_alerts = pos.alerts | length > 0 %}
+{% set pnl_pos = pos.pnl_pct >= 0 %}
+{% set sig = pos.signal %}
+{% set cons = pos.consensus %}
+
+<div class="pos-card {% if has_alerts %}pos-card-alert{% endif %}">
+
+  <!-- Card header -->
+  <div class="pos-header">
+    <div class="pos-title-group">
+      <a href="/stock/{{ pos.ticker }}" class="pos-ticker">
+        {% if pos.market == "HK" %}{{ pos.display_ticker or pos.ticker }}{% else %}${{ pos.ticker }}{% endif %}
+      </a>
+      {% set dname = sig.display_name if sig and sig.display_name else pos.name %}
+      <span class="pos-name">{{ dname }}</span>
+      <span class="market-badge market-{{ pos.market }}">{{ pos.market }}</span>
+      {% if cons %}
+      <span class="badge badge-{{ cons }}">{{ cons | upper }}</span>
+      {% endif %}
+    </div>
+    <div class="pos-pnl {% if pnl_pos %}pnl-pos{% else %}pnl-neg{% endif %}">
+      {{ '%+.2f'|format(pos.pnl) }} ({{ '%+.1f'|format(pos.pnl_pct) }}%)
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  {% if pos.alerts %}
+  <div class="pos-alerts">
+    {% for a in pos.alerts %}
+    <div class="pos-alert-item">{{ a }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Position stats row -->
+  <div class="pos-stats">
+    <div class="ps-item">
+      <div class="ps-label">Quantity</div>
+      <div class="ps-val">{{ pos.qty }} shares</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-label">Cost Price</div>
+      <div class="ps-val">${{ "%.2f"|format(pos.cost_price) }}</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-label">Current Price</div>
+      <div class="ps-val">${{ "%.2f"|format(pos.current_price) }}</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-label">Market Value</div>
+      <div class="ps-val">${{ "{:,.2f}".format(pos.market_val) }}</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-label">P&amp;L</div>
+      <div class="ps-val {% if pnl_pos %}pnl-pos{% else %}pnl-neg{% endif %}">
+        {{ '%+.2f'|format(pos.pnl) }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Signal levels from our TA engine -->
+  {% if sig and sig.short_term %}
+  {% set tf_list = [
+      ("short_term",     "⚡ Short-Term"),
+      ("swing_trade",    "🔄 Swing"),
+      ("position_trade", "🏗️ Position")
+  ] %}
+  <div class="pos-signals-wrap">
+    <div class="pos-signals-title">AI Trading Signals for this position</div>
+    <div class="pos-signal-row">
+      {% for tf_key, tf_label in tf_list %}
+      {% set tf = sig[tf_key] if sig[tf_key] is mapping else {} %}
+      {% if tf %}
+      <div class="pos-tf-col">
+        <div class="pos-tf-head">{{ tf_label }}</div>
+
+        <!-- Stop loss — most critical for existing holders -->
+        <div class="pos-level stop-level">
+          <span class="pl-icon">🛑</span>
+          <span class="pl-label">Stop</span>
+          <span class="pl-price">${{ "%.2f"|format(tf.stop_loss) if tf.stop_loss else "—" }}</span>
+          {% if tf.stop_loss and pos.current_price %}
+          <span class="sl-pct">{{ "%.1f"|format((tf.stop_loss / pos.current_price - 1) * 100) }}%</span>
+          {% endif %}
+        </div>
+
+        <!-- Cost vs stop: am I already below stop? -->
+        {% if tf.stop_loss and pos.cost_price and pos.cost_price <= tf.stop_loss %}
+        <div class="cost-below-stop">Cost below stop — consider exit</div>
+        {% endif %}
+
+        <!-- Take profit 1 -->
+        <div class="pos-level tp1-level">
+          <span class="pl-icon">✅</span>
+          <span class="pl-label">TP1</span>
+          <span class="pl-price">${{ "%.2f"|format(tf.take_profit_1) if tf.take_profit_1 else "—" }}</span>
+          {% if tf.take_profit_1 and pos.current_price %}
+          <span class="tp-pct">+{{ "%.1f"|format((tf.take_profit_1 / pos.current_price - 1) * 100) }}%</span>
+          {% endif %}
+        </div>
+
+        <!-- Take profit 2 -->
+        <div class="pos-level tp2-level">
+          <span class="pl-icon">🎯</span>
+          <span class="pl-label">TP2</span>
+          <span class="pl-price">${{ "%.2f"|format(tf.take_profit_2) if tf.take_profit_2 else "—" }}</span>
+          {% if tf.take_profit_2 and pos.current_price %}
+          <span class="tp-pct">+{{ "%.1f"|format((tf.take_profit_2 / pos.current_price - 1) * 100) }}%</span>
+          {% endif %}
+        </div>
+
+        <div class="pos-rr">R:R {{ tf.risk_reward }}</div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    {% if sig.technical_summary %}
+    <div class="pos-tech-note">🤖 {{ sig.technical_summary }}</div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="pos-no-signal">
+    No trading signal cached for ${{ pos.display_ticker or pos.ticker }} yet.
+    <a href="/signals">Go to Signals page</a> to trigger analysis, or
+    this stock may not be in the bullish consensus.
+  </div>
+  {% endif %}
+
+  <!-- TradingView mini chart -->
+  {% if pos.market == "HK" %}
+  {% set tv_sym = pos.signal.tv_symbol if pos.signal and pos.signal.tv_symbol else 'HKEX:' ~ (pos.display_ticker or pos.ticker) %}
+  <div class="pos-chart-wrap" style="height:320px;">
+    <div class="tradingview-widget-container" style="height:100%;width:100%">
+      <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+      {
+        "autosize": true,
+        "symbol": "{{ tv_sym }}",
+        "interval": "D",
+        "timezone": "Asia/Hong_Kong",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "allow_symbol_change": false,
+        "studies": ["RSI@tv-basicstudies", "MACD@tv-basicstudies"]
+      }
+      </script>
+    </div>
+  </div>
+  {% elif sig and sig.tv_symbol %}
+  <div class="pos-chart-wrap">
+    <div id="pos_tv_{{ pos.ticker }}" style="height:300px;"></div>
+  </div>
+  {% endif %}
+
+</div><!-- /pos-card -->
+{% endfor %}
+{% endif %}
+{% endif %}<!-- /connected or positions -->
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+const posTvConfigs = [
+  {% for pos in positions %}
+  {% if pos.market != "HK" and pos.signal and pos.signal.tv_symbol %}
+  { id: "pos_tv_{{ pos.ticker }}", symbol: "{{ pos.signal.tv_symbol }}", cost: {{ pos.cost_price }} },
+  {% endif %}
+  {% endfor %}
+];
+document.addEventListener("DOMContentLoaded", () => {
+  posTvConfigs.forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    if (!el) return;
+    try {
+      new TradingView.widget({
+        container_id:      cfg.id,
+        symbol:            cfg.symbol,
+        interval:          "D",
+        timezone:          "America/New_York",
+        theme:             "dark",
+        style:             "1",
+        locale:            "en",
+        width:             "100%",
+        height:            300,
+        enable_publishing: false,
+        allow_symbol_change: false,
+        save_image:        false,
+        studies: ["RSI@tv-basicstudies", "MACD@tv-basicstudies"],
+      });
+    } catch(e) {}
+  });
+});
+</script>
+{% endblock %}

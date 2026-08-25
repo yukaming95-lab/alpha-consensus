@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Admin — Alpha Consensus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Admin</h1>
+  <p class="subtitle">Add posts manually · Manage tracked traders</p>
+</div>
+
+<!-- Add Post Form -->
+<section class="admin-section">
+  <h2>Add Post</h2>
+  <p class="hint">Paste a tweet/post — DeepSeek AI will extract tickers and classify stances automatically.</p>
+  <form id="add-post-form" class="admin-form">
+    <div class="form-row">
+      <label>Trader Handle
+        <select name="handle" required>
+          {% for t in traders %}
+          <option value="{{ t.x_handle }}">@{{ t.x_handle }} — {{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="form-row">
+      <label>Post Text
+        <textarea name="post_text" rows="4" placeholder="Paste the tweet or post here…" required></textarea>
+      </label>
+    </div>
+    <div class="form-row two-col">
+      <label>Post URL (optional)
+        <input type="url" name="post_url" placeholder="https://x.com/…" />
+      </label>
+      <label>Date/Time (optional, UTC)
+        <input type="datetime-local" name="posted_at" />
+      </label>
+    </div>
+    <button type="submit" class="btn-primary">Analyze &amp; Save</button>
+  </form>
+  <div id="add-result" class="add-result hidden"></div>
+</section>
+
+<!-- Trader List -->
+<section class="admin-section">
+  <h2>Tracked Traders</h2>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Handle</th><th>Name</th><th>Description</th><th>Status</th><th>Toggle</th></tr></thead>
+      <tbody>
+        {% for t in traders %}
+        <tr>
+          <td><a href="/trader/{{ t.x_handle }}">@{{ t.x_handle }}</a></td>
+          <td>{{ t.name }}</td>
+          <td>{{ t.description }}</td>
+          <td><span class="badge {% if t.active %}badge-bullish{% else %}badge-bearish{% endif %}">
+            {{ 'Active' if t.active else 'Inactive' }}
+          </span></td>
+          <td>
+            <form action="/admin/toggle-trader" method="post" style="margin:0">
+              <input type="hidden" name="handle" value="{{ t.x_handle }}" />
+              <button type="submit" class="btn-sm">Toggle</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById("add-post-form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+  const btn = this.querySelector("button[type=submit]");
+  btn.disabled = true;
+  btn.textContent = "Analyzing…";
+
+  const form = new FormData(this);
+  const dt = form.get("posted_at");
+  if (dt) form.set("posted_at", dt.replace("T", " ") + ":00");
+
+  try {
+    const res  = await fetch("/admin/add-post", { method: "POST", body: form });
+    const data = await res.json();
+    const el   = document.getElementById("add-result");
+    el.classList.remove("hidden", "error");
+    if (data.error) {
+      el.classList.add("error");
+      el.innerHTML = `<strong>Error:</strong> ${data.error}`;
+    } else if (data.mentions && data.mentions.length > 0) {
+      const rows = data.mentions.map(m =>
+        `<li><strong>$${m.ticker}</strong> — <span class="badge badge-${m.stance}">${m.stance.toUpperCase()}</span> · ${m.reasoning}</li>`
+      ).join("");
+      el.innerHTML = `<strong>✓ Saved!</strong> Detected mentions:<ul>${rows}</ul>`;
+      document.getElementById("add-post-form").reset();
+    } else {
+      el.innerHTML = `<strong>✓ Saved!</strong> No stock tickers detected in this post.`;
+      document.getElementById("add-post-form").reset();
+    }
+  } catch(err) {
+    const el = document.getElementById("add-result");
+    el.classList.remove("hidden");
+    el.classList.add("error");
+    el.textContent = "Request failed: " + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analyze & Save";
+  }
+});
+</script>
+{% endblock %}
