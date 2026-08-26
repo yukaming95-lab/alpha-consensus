@@ -11,6 +11,7 @@ import signals as sg
 import futu_portfolio as fp
 
 app = Flask(__name__)
+app.config["PROPAGATE_EXCEPTIONS"] = True
 
 
 @app.before_request

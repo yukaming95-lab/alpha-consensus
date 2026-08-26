@@ -185,7 +185,7 @@
         <span class="ta-lbl">MACD</span>
         <span class="ta-val {% if sig.macd_hist and sig.macd_hist > 0 %}score-pos-text{% elif sig.macd_hist and sig.macd_hist < 0 %}score-neg-text{% endif %}">
           {{ sig.macd }} / Sig: {{ sig.macd_signal }}
-          (hist {{ "%+.3f"|format(sig.macd_hist) }})
+          {% if sig.macd_hist is not none %}(hist {{ "%+.3f"|format(sig.macd_hist) }}){% endif %}
         </span>
       </div>
 
