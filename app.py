@@ -129,8 +129,12 @@ def my_portfolio():
 
 @app.route("/signals")
 def signals():
-    all_sigs = sg.get_all_signals()
-    return render_template("signals.html", signals=all_sigs)
+    import traceback
+    try:
+        all_sigs = sg.get_all_signals()
+        return render_template("signals.html", signals=all_sigs)
+    except Exception:
+        return f"<pre>{traceback.format_exc()}</pre>", 500
 
 
 @app.route("/api/signals/refresh", methods=["POST"])
