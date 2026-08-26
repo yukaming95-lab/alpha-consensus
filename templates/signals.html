@@ -244,10 +244,10 @@
         <div class="sr-row support-row">
           <div class="sr-bar-wrap">
             <div class="sr-bar support-bar"
-                 style="width:{{ [((sig.price / s) * 55)|round, 95]|min }}%"></div>
+                 style="width:{{ [((sig.price / s) * 55)|round, 95]|min if s else 0 }}%"></div>
           </div>
-          <span class="sr-price">${{ "%.2f"|format(s) }}</span>
-          <span class="sr-dist sl-pct">{{ "%+.1f"|format((s / sig.price - 1) * 100) }}%</span>
+          <span class="sr-price">${{ "%.2f"|format(s) if s else '—' }}</span>
+          <span class="sr-dist sl-pct">{{ "%+.1f"|format((s / sig.price - 1) * 100) if s else '' }}%</span>
         </div>
         {% endfor %}
       </div>
