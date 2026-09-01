@@ -301,7 +301,7 @@ Generate three distinct trading setups. For each, calculate levels based on the 
             model=DEEPSEEK_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=700,
+            max_tokens=1500,
         )
         raw = resp.choices[0].message.content.strip()
         if raw.startswith("```"):
