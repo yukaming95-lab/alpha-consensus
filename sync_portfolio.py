@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-CLOUD_URL  = "https://yukaming.pythonanywhere.com/api/portfolio/sync"
+CLOUD_URL  = "https://web-production-9424.up.railway.app/api/portfolio/sync"
 SYNC_KEY   = os.getenv("PORTFOLIO_SYNC_KEY", "")
 INTERVAL   = 600  # seconds (10 minutes)
 
